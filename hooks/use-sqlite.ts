@@ -10,8 +10,13 @@ export type UseSQLiteOptions = {
   onInit?: (db: SQLite.SQLiteDatabase) => Promise<void> | void; // callback après init
 };
 
+// Verrous globaux pour éviter les initialisations concurrentes par base
+const initPromisesByDb = new Map<string, Promise<void>>();
+const initializedDbs = new Set<string>();
+
 export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   const db = useMemo(() => SQLite.openDatabaseSync(dbName), [dbName]);
+  const hasSchema = Boolean(options?.schema && options.schema.length > 0);
 
   const run = useCallback(
     async (sql: string, params: QueryParams = []) => {
@@ -52,14 +57,40 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   );
 
   const init = useCallback(async () => {
-    if (options?.schema && options.schema.length > 0) {
-      const stmts = options.schema.map((sql) => ({ sql }));
-      await transaction(stmts);
+    // Si aucune initialisation requise, sortir tôt
+    if (!hasSchema && !options?.onInit) return;
+
+    // Déjà initialisé pour cette base ?
+    if (initializedDbs.has(dbName)) {
+      if (options?.onInit) await options.onInit(db);
+      return;
     }
-    if (options?.onInit) {
-      await options.onInit(db);
+
+    // Initialisation déjà en cours ? Attendre le verrou
+    const pending = initPromisesByDb.get(dbName);
+    if (pending) {
+      await pending;
+      if (options?.onInit) await options.onInit(db);
+      return;
     }
-  }, [db, options, transaction]);
+
+    const initPromise = (async () => {
+      try {
+        if (hasSchema) {
+          const stmts = (options!.schema as string[]).map((sql) => ({ sql }));
+          await transaction(stmts);
+        }
+        initializedDbs.add(dbName);
+      } finally {
+        initPromisesByDb.delete(dbName);
+      }
+    })();
+
+    initPromisesByDb.set(dbName, initPromise);
+    await initPromise;
+
+    if (options?.onInit) await options.onInit(db);
+  }, [db, dbName, hasSchema, options, transaction]);
 
   useEffect(() => {
     // Initialise la base si un schéma est fourni

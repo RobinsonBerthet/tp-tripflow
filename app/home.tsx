@@ -1,9 +1,14 @@
 import BottomNavbar from "@/components/organisms/BottomNavbar";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Link } from "expo-router";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Dimensions, StyleSheet, View } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { AccountSlide, HomeSlide, TravelSlide } from "../components/templates";
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? "light";
@@ -11,31 +16,45 @@ export default function HomeScreen() {
     colorScheme === "dark" ? "dark" : "light"
   ) as keyof typeof Colors;
 
+  const [selectedTab, setSelectedTab] = useState<"home" | "voyages" | "profil">(
+    "home"
+  );
+
+  const { width } = Dimensions.get("screen");
+  const translateX = useSharedValue(0);
+
+  const tabIndex =
+    selectedTab === "home" ? 0 : selectedTab === "voyages" ? 1 : 2;
+
+  useEffect(() => {
+    translateX.value = withTiming(-tabIndex * width, { duration: 250 });
+  }, [tabIndex, width, translateX]);
+
+  const slidesStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
   return (
     <View
       style={[styles.container, { backgroundColor: Colors[theme].background }]}
     >
-      <Text style={[styles.title, { color: Colors[theme].text }]}>
-        Bienvenue sur Home
-      </Text>
-
-      <Link href="/home" asChild>
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            pressed && styles.buttonPressed,
-          ]}
+      <View style={[styles.sliderContainer, { width }]}>
+        <Animated.View
+          style={[styles.slidesRow, slidesStyle, { width: width * 3 }]}
         >
-          <Text style={styles.buttonText}>Aller au Login</Text>
-        </Pressable>
-      </Link>
+          <View style={[styles.slide, { width }]}>
+            <HomeSlide />
+          </View>
+          <View style={[styles.slide, { width }]}>
+            <TravelSlide />
+          </View>
+          <View style={[styles.slide, { width }]}>
+            <AccountSlide />
+          </View>
+        </Animated.View>
+      </View>
 
-      <BottomNavbar
-        onPressItem={(i) => {
-          // Placeholder d’action
-          console.log("Nav item pressed", i);
-        }}
-      />
+      <BottomNavbar selectedTab={selectedTab} setSelectedTab={setSelectedTab} />
     </View>
   );
 }
@@ -45,7 +64,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
   },
   title: {
     fontSize: 24,
@@ -64,5 +82,17 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#fff",
     fontWeight: "600",
+  },
+  sliderContainer: {
+    flex: 1,
+    width: "100%",
+    overflow: "hidden",
+  },
+  slidesRow: {
+    flex: 1,
+    flexDirection: "row",
+  },
+  slide: {
+    flex: 1,
   },
 });

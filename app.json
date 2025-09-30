@@ -4,19 +4,22 @@
     "slug": "tp-tripflow",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/iconApp.png",
     "scheme": "tptripflow",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Votre position est utilisée pour centrer la carte autour de vous."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundImage": "./assets/images/icon.png",
-        "monochromeImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/images/iconApp.png",
+        "backgroundImage": "./assets/images/iconApp.png",
+        "monochromeImage": "./assets/images/iconApp.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false

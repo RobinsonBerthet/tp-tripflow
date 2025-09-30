@@ -15,7 +15,11 @@ export function ThemedText({
   ...rest
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, "text");
-  return <Text {...rest} style={[{ color }, style]} />;
+  return (
+    <Text {...rest} style={[{ color }, style]}>
+      {rest.children}
+    </Text>
+  );
 }
 
 export default ThemedText;
