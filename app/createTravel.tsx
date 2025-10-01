@@ -173,9 +173,10 @@ export default function CreateTravelScreen() {
 
       if (insertId) {
         Alert.alert("Voyage", "Voyage créé avec succès.");
-        router.replace("/home");
+        router.back();
       }
-    } catch {
+    } catch (err) {
+      console.log("Erreur", err);
       Alert.alert("Erreur", "Impossible de créer le voyage. Réessayez.");
     } finally {
       setLoading(false);

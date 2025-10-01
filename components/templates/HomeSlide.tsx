@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import {
-  FlatList,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   useColorScheme,
@@ -70,6 +70,7 @@ export default function HomeSlide({
     const loadVoyages = async () => {
       try {
         const userLogin = (await SecureStore.getItemAsync("userLogin")) ?? "";
+        console.log("HomeSlide:userLogin", userLogin);
         if (!userLogin) {
           setVoyages([]);
           return;
@@ -78,6 +79,7 @@ export default function HomeSlide({
           "SELECT ID FROM UTILISATEUR WHERE IDENTIFIANT = ?",
           [userLogin]
         );
+        console.log("HomeSlide:user", user);
         if (!user) {
           setVoyages([]);
           return;
@@ -86,6 +88,8 @@ export default function HomeSlide({
           "SELECT * FROM VOYAGE WHERE ID_UTILISATEUR = ? ORDER BY DATE_ALLER DESC",
           [user.ID]
         );
+        console.log("HomeSlide:voyages count", rows.length);
+        console.log("HomeSlide:voyages rows", rows);
         setVoyages(rows);
       } finally {
         setLoading(false);
@@ -131,10 +135,10 @@ export default function HomeSlide({
 
         <View
           style={{
-            width: "80%",
+            width: "100%",
+            marginTop: "10%",
+            height: "80%",
             marginHorizontal: "auto",
-            marginTop: 12,
-            flex: 1,
           }}
         >
           {loading ? null : voyages.length === 0 ? (
@@ -142,13 +146,21 @@ export default function HomeSlide({
               Aucun voyage pour le moment.
             </ThemedText>
           ) : (
-            <FlatList
-              data={voyages}
-              keyExtractor={(item) => String(item.ID)}
-              contentContainerStyle={{ paddingBottom: 24 }}
-              renderItem={({ item }) => (
+            <ScrollView
+              contentContainerStyle={{
+                paddingBottom: 24,
+                width: "80%",
+                marginHorizontal: "auto",
+                height: 500,
+              }}
+            >
+              {voyages.map((item) => (
                 <View
-                  style={[styles.card, { borderColor: Colors[theme].tint }]}
+                  key={String(item.ID)}
+                  style={[
+                    styles.card,
+                    { borderColor: Colors[theme].tint, height: 100 },
+                  ]}
                 >
                   <View style={{ flex: 1 }}>
                     <ThemedText style={styles.cardTitle}>
@@ -160,8 +172,8 @@ export default function HomeSlide({
                     </ThemedText>
                   </View>
                 </View>
-              )}
-            />
+              ))}
+            </ScrollView>
           )}
         </View>
       </View>
@@ -170,9 +182,7 @@ export default function HomeSlide({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: {},
   title: {
     fontSize: 16,
     fontWeight: "700",
@@ -186,7 +196,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 25,
     padding: 12,
     marginBottom: 12,
   },
