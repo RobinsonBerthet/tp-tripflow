@@ -7,11 +7,13 @@ import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import useSQLite from "@/hooks/use-sqlite";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -63,7 +65,8 @@ export default function CreateTravelScreen() {
   );
   const [lieu, setLieu] = useState("");
   const [description, setDescription] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
+  const [imageUri, setImageUri] = useState("");
+  const [savingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showDateAllerPicker, setShowDateAllerPicker] = useState(false);
   const [showDateRetourPicker, setShowDateRetourPicker] = useState(false);
@@ -87,6 +90,54 @@ export default function CreateTravelScreen() {
     const m = String(date.getMonth() + 1).padStart(2, "0");
     const y = date.getFullYear();
     return `${d}/${m}/${y}`;
+  };
+
+  // On utilise directement l'URI local renvoyé par l'Image Picker
+
+  const handlePickImage = async () => {
+    try {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission",
+          "Autorisez l'accès à la bibliothèque pour continuer."
+        );
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch {
+      Alert.alert("Image", "Échec de la sélection de l'image.");
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission",
+          "Autorisez l'accès à la caméra pour continuer."
+        );
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch {
+      Alert.alert("Image", "Échec de la prise de photo.");
+    }
   };
 
   const handleCreateTravel = async () => {
@@ -114,7 +165,7 @@ export default function CreateTravelScreen() {
         return;
       }
 
-      const imageValue = imageUrl || "https://placehold.co/600x400";
+      const imageValue = imageUri || "https://placehold.co/600x400";
       const { insertId } = await run(
         "INSERT INTO VOYAGE (TITRE, DATE_ALLER, DATE_RETOUR, LIEU, DESCRIPTION, IMAGE, ID_UTILISATEUR) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [title, dateAller, dateRetour, lieu, description, imageValue, user.ID]
@@ -245,15 +296,24 @@ export default function CreateTravelScreen() {
             </View>
 
             <View style={styles.field}>
-              <ThemedLabel>Image (URL)</ThemedLabel>
-              <ThemedTextInput
-                value={imageUrl}
-                onChangeText={setImageUrl}
-                placeholder="https://…"
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.input}
-              />
+              <ThemedLabel>Image de couverture</ThemedLabel>
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+              ) : null}
+              <View style={styles.buttonRow}>
+                <ThemedButton
+                  title={savingImage ? "Enregistrement…" : "Choisir une photo"}
+                  onPress={handlePickImage}
+                  disabled={savingImage || loading}
+                  style={styles.secondaryButton}
+                />
+                <ThemedButton
+                  title={savingImage ? "Enregistrement…" : "Prendre une photo"}
+                  onPress={handleTakePhoto}
+                  disabled={savingImage || loading}
+                  style={styles.secondaryButton}
+                />
+              </View>
             </View>
 
             <ThemedButton
@@ -291,6 +351,20 @@ const styles = StyleSheet.create({
   textarea: {
     minHeight: 100,
     textAlignVertical: "top",
+  },
+  imagePreview: {
+    width: "100%",
+    aspectRatio: 16 / 9,
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  secondaryButton: {
+    flex: 1,
   },
   button: {
     backgroundColor: "#0a7ea4",
