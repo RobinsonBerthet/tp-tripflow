@@ -18,35 +18,48 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   const db = useMemo(() => SQLite.openDatabaseSync(dbName), [dbName]);
   const hasSchema = Boolean(options?.schema && options.schema.length > 0);
 
+  const waitForInitIfNeeded = useCallback(async () => {
+    // Si une initialisation est en cours pour cette base, attendre qu'elle se termine
+    const pending = initPromisesByDb.get(dbName);
+    if (pending) {
+      await pending;
+    }
+  }, [dbName]);
+
   const run = useCallback(
     async (sql: string, params: QueryParams = []) => {
+      await waitForInitIfNeeded();
       const res = await db.runAsync(sql, params);
       return {
         rowsAffected: res.changes,
         insertId: (res as any).lastInsertRowId as number | undefined,
       };
     },
-    [db]
+    [db, waitForInitIfNeeded]
   );
 
   const queryAll = useCallback(
     async <T = any>(sql: string, params: QueryParams = []) => {
+      await waitForInitIfNeeded();
       const rows = await db.getAllAsync<T>(sql, params);
       return rows;
     },
-    [db]
+    [db, waitForInitIfNeeded]
   );
 
   const queryOne = useCallback(
     async <T = any>(sql: string, params: QueryParams = []) => {
+      await waitForInitIfNeeded();
       const row = await db.getFirstAsync<T>(sql, params);
       return (row ?? null) as T | null;
     },
-    [db]
+    [db, waitForInitIfNeeded]
   );
 
   const transaction = useCallback(
     async (statements: SQLStatement[]): Promise<void> => {
+      // Transaction peut être utilisée par l'init elle-même. Éviter d'attendre ici
+      // pour ne pas créer de deadlock si déjà dans l'init.
       await db.withTransactionAsync(async () => {
         for (const { sql, params } of statements) {
           await db.runAsync(sql, params ?? []);
