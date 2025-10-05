@@ -11,6 +11,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type VoyageRow = {
   ID: number;
@@ -38,35 +39,7 @@ export default function TravelDetailScreen() {
   const idParam = Array.isArray(params.id) ? params.id[0] : params.id;
   const voyageId = useMemo(() => Number(idParam), [idParam]);
 
-  const { queryOne, queryAll, run } = useSQLite("tripflow.db", {
-    schema: [
-      `CREATE TABLE IF NOT EXISTS UTILISATEUR (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        IDENTIFIANT TEXT UNIQUE NOT NULL,
-        MOT_DE_PASSE TEXT NOT NULL,
-        DATE_INSCRIPTION TEXT NOT NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS VOYAGE (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        TITRE TEXT NOT NULL,
-        DATE_ALLER TEXT NOT NULL,
-        DATE_RETOUR TEXT NOT NULL,
-        LIEU TEXT NOT NULL,
-        DESCRIPTION TEXT NOT NULL,
-        IMAGE TEXT NOT NULL,
-        ID_UTILISATEUR INTEGER NOT NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS ETAPE (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        ID_VOYAGE INTEGER NOT NULL,
-        NOM_LIEU TEXT NOT NULL,
-        LOCALISATION TEXT NOT NULL,
-        DATE_DEBUT TEXT NOT NULL,
-        DATE_FIN TEXT NOT NULL,
-        DESCRIPTION TEXT NOT NULL
-      )`,
-    ],
-  });
+  const { queryOne, queryAll, run, ready } = useSQLite("tripflow.db");
 
   const [voyage, setVoyage] = useState<VoyageRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +60,7 @@ export default function TravelDetailScreen() {
 
   const loadData = useCallback(async () => {
     try {
+      if (!ready) return;
       if (!voyageId || Number.isNaN(voyageId)) {
         setVoyage(null);
         setSteps([]);
@@ -105,7 +79,7 @@ export default function TravelDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [voyageId, queryOne, queryAll]);
+  }, [ready, voyageId, queryOne, queryAll]);
 
   useEffect(() => {
     void loadData();
@@ -146,7 +120,7 @@ export default function TravelDetailScreen() {
     return `${day}/${month}/${year}`;
   };
 
-  if (loading) return null;
+  if (loading || !ready) return null;
 
   if (!voyage) {
     return (
@@ -159,118 +133,125 @@ export default function TravelDetailScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.imageCard}>
-        <ImageBackground
-          source={{ uri: getImage(voyage.IMAGE) }}
-          style={styles.image}
-        >
-          <View style={styles.heroTopPanel}>
-            <ThemedText style={styles.title}>{voyage.TITRE}</ThemedText>
-          </View>
-        </ImageBackground>
-      </View>
-
-      <View style={styles.metaCard}>
-        <View style={styles.row}>
-          <Ionicons name="location-sharp" size={16} color="#666" />
-          <ThemedText style={styles.metaText}>{voyage.LIEU}</ThemedText>
-        </View>
-        <ThemedText style={styles.metaText}>
-          du {formatDateDisplay(voyage.DATE_ALLER)} au{" "}
-          {formatDateDisplay(voyage.DATE_RETOUR)}
-        </ThemedText>
-      </View>
-
-      <View style={styles.descCard}>
-        <ThemedText style={styles.desc}>{voyage.DESCRIPTION}</ThemedText>
-      </View>
-
-      <View style={styles.stepsHeader}>
-        <ThemedText style={styles.stepsTitle}>Étapes</ThemedText>
-        <ThemedButton
-          title="Ajouter une étape"
-          onPress={() =>
-            router.push({
-              pathname: "/travel/[id]/add-step",
-              params: { id: String(voyage.ID) },
-            } as any)
-          }
-        />
-      </View>
-
-      {steps.length === 0 ? (
-        <ThemedText style={styles.metaText}>
-          Aucune étape pour le moment.
-        </ThemedText>
-      ) : (
-        <View style={{ gap: 10 }}>
-          {steps.map((st) => (
-            <View key={String(st.ID)} style={styles.stepCard}>
-              <View style={{ flex: 1 }}>
-                <ThemedText style={styles.stepTitle}>{st.NOM_LIEU}</ThemedText>
-                <ThemedText style={styles.metaText}>
-                  {st.LOCALISATION}
-                </ThemedText>
-                <ThemedText style={styles.metaText}>
-                  du {formatDateDisplay2(st.DATE_DEBUT)} au{" "}
-                  {formatDateDisplay2(st.DATE_FIN)}
-                </ThemedText>
-                <ThemedText style={styles.stepDesc}>
-                  {st.DESCRIPTION}
-                </ThemedText>
-              </View>
-              <View style={styles.stepActions}>
-                <ThemedButton
-                  title="Modifier"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/travel/[id]/step/[stepId]",
-                      params: { id: String(voyage.ID), stepId: String(st.ID) },
-                    } as any)
-                  }
-                />
-                <ThemedButton
-                  title="Supprimer"
-                  lightColor="#e11d48"
-                  darkColor="#e11d48"
-                  onPress={() =>
-                    Alert.alert("Supprimer", "Supprimer cette étape ?", [
-                      { text: "Annuler", style: "cancel" },
-                      {
-                        text: "Supprimer",
-                        style: "destructive",
-                        onPress: async () => {
-                          try {
-                            await run(
-                              "DELETE FROM ETAPE WHERE ID = ? AND ID_VOYAGE = ?",
-                              [st.ID, voyage.ID]
-                            );
-                            void loadData();
-                          } catch {
-                            Alert.alert("Erreur", "Suppression impossible.");
-                          }
-                        },
-                      },
-                    ])
-                  }
-                />
-              </View>
+    <SafeAreaView style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.imageCard}>
+          <ImageBackground
+            source={{ uri: getImage(voyage.IMAGE) }}
+            style={styles.image}
+          >
+            <View style={styles.heroTopPanel}>
+              <ThemedText style={styles.title}>{voyage.TITRE}</ThemedText>
             </View>
-          ))}
+          </ImageBackground>
         </View>
-      )}
 
-      <View style={styles.actions}>
-        <ThemedButton
-          title="Supprimer le voyage"
-          onPress={handleDelete}
-          lightColor="#e11d48"
-          darkColor="#e11d48"
-          style={{ paddingVertical: 14 }}
-        />
-      </View>
-    </ScrollView>
+        <View style={styles.metaCard}>
+          <View style={styles.row}>
+            <Ionicons name="location-sharp" size={16} color="#666" />
+            <ThemedText style={styles.metaText}>{voyage.LIEU}</ThemedText>
+          </View>
+          <ThemedText style={styles.metaText}>
+            du {formatDateDisplay(voyage.DATE_ALLER)} au{" "}
+            {formatDateDisplay(voyage.DATE_RETOUR)}
+          </ThemedText>
+        </View>
+
+        <View style={styles.descCard}>
+          <ThemedText style={styles.desc}>{voyage.DESCRIPTION}</ThemedText>
+        </View>
+
+        <View style={styles.stepsHeader}>
+          <ThemedText style={styles.stepsTitle}>Étapes</ThemedText>
+          <ThemedButton
+            title="Ajouter une étape"
+            onPress={() =>
+              router.push({
+                pathname: "/travel/[id]/add-step",
+                params: { id: String(voyage.ID) },
+              } as any)
+            }
+          />
+        </View>
+
+        {steps.length === 0 ? (
+          <ThemedText style={styles.metaText}>
+            Aucune étape pour le moment.
+          </ThemedText>
+        ) : (
+          <View style={{ gap: 10 }}>
+            {steps.map((st) => (
+              <View key={String(st.ID)} style={styles.stepCard}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.stepTitle}>
+                    {st.NOM_LIEU}
+                  </ThemedText>
+                  <ThemedText style={styles.metaText}>
+                    {st.LOCALISATION}
+                  </ThemedText>
+                  <ThemedText style={styles.metaText}>
+                    du {formatDateDisplay2(st.DATE_DEBUT)} au{" "}
+                    {formatDateDisplay2(st.DATE_FIN)}
+                  </ThemedText>
+                  <ThemedText style={styles.stepDesc}>
+                    {st.DESCRIPTION}
+                  </ThemedText>
+                </View>
+                <View style={styles.stepActions}>
+                  <ThemedButton
+                    title="Modifier"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/travel/[id]/step/[stepId]",
+                        params: {
+                          id: String(voyage.ID),
+                          stepId: String(st.ID),
+                        },
+                      } as any)
+                    }
+                  />
+                  <ThemedButton
+                    title="Supprimer"
+                    lightColor="#e11d48"
+                    darkColor="#e11d48"
+                    onPress={() =>
+                      Alert.alert("Supprimer", "Supprimer cette étape ?", [
+                        { text: "Annuler", style: "cancel" },
+                        {
+                          text: "Supprimer",
+                          style: "destructive",
+                          onPress: async () => {
+                            try {
+                              await run(
+                                "DELETE FROM ETAPE WHERE ID = ? AND ID_VOYAGE = ?",
+                                [st.ID, voyage.ID]
+                              );
+                              void loadData();
+                            } catch {
+                              Alert.alert("Erreur", "Suppression impossible.");
+                            }
+                          },
+                        },
+                      ])
+                    }
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.actions}>
+          <ThemedButton
+            title="Supprimer le voyage"
+            onPress={handleDelete}
+            lightColor="#e11d48"
+            darkColor="#e11d48"
+            style={{ paddingVertical: 14 }}
+          />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 

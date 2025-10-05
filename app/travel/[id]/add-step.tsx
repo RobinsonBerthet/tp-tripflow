@@ -16,6 +16,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type StepForm = {
   title: string;
@@ -30,19 +31,7 @@ export default function AddStepScreen() {
   const idParam = Array.isArray(params.id) ? params.id[0] : params.id;
   const voyageId = useMemo(() => Number(idParam), [idParam]);
 
-  const { run } = useSQLite("tripflow.db", {
-    schema: [
-      `CREATE TABLE IF NOT EXISTS ETAPE (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        ID_VOYAGE INTEGER NOT NULL,
-        NOM_LIEU TEXT NOT NULL,
-        LOCALISATION TEXT NOT NULL,
-        DATE_DEBUT TEXT NOT NULL,
-        DATE_FIN TEXT NOT NULL,
-        DESCRIPTION TEXT NOT NULL
-      )`,
-    ],
-  });
+  const { run } = useSQLite("tripflow.db");
 
   const [form, setForm] = useState<StepForm>({
     title: "",
@@ -98,101 +87,103 @@ export default function AddStepScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1 }}
-    >
-      <ScrollView contentContainerStyle={styles.container}>
-        <ThemedText style={styles.title}>Nouvelle étape</ThemedText>
+    <SafeAreaView style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+      >
+        <ScrollView contentContainerStyle={styles.container}>
+          <ThemedText style={styles.title}>Nouvelle étape</ThemedText>
 
-        <View style={styles.field}>
-          <ThemedLabel>Nom du lieu</ThemedLabel>
-          <ThemedTextInput
-            placeholder="Ex: Musée du Louvre"
-            value={form.title}
-            onChangeText={(t) => setForm((s) => ({ ...s, title: t }))}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <ThemedLabel>Localisation du lieu</ThemedLabel>
-          <ThemedTextInput
-            placeholder="Ex: Paris, France"
-            value={form.location}
-            onChangeText={(t) => setForm((s) => ({ ...s, location: t }))}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <Pressable
-            onPress={() => {
-              Keyboard.dismiss();
-              setShowStartPicker(true);
-            }}
-          >
-            <ThemedLabel>
-              {`Date de début: ${formatDateDisplay(
-                parseDateOrToday(form.startDate)
-              )}`}
-            </ThemedLabel>
-          </Pressable>
-          {showStartPicker && (
-            <DateTimePicker
-              value={parseDateOrToday(form.startDate)}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(_, d) => {
-                if (d) setForm((s) => ({ ...s, startDate: formatDate(d) }));
-                setShowStartPicker(false);
-              }}
+          <View style={styles.field}>
+            <ThemedLabel>Nom du lieu</ThemedLabel>
+            <ThemedTextInput
+              placeholder="Ex: Musée du Louvre"
+              value={form.title}
+              onChangeText={(t) => setForm((s) => ({ ...s, title: t }))}
             />
-          )}
-        </View>
+          </View>
 
-        <View style={styles.field}>
-          <Pressable
-            onPress={() => {
-              Keyboard.dismiss();
-              setShowEndPicker(true);
-            }}
-          >
-            <ThemedLabel>
-              {`Date de fin: ${formatDateDisplay(
-                parseDateOrToday(form.endDate)
-              )}`}
-            </ThemedLabel>
-          </Pressable>
-          {showEndPicker && (
-            <DateTimePicker
-              value={parseDateOrToday(form.endDate)}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(_, d) => {
-                if (d) setForm((s) => ({ ...s, endDate: formatDate(d) }));
-                setShowEndPicker(false);
-              }}
+          <View style={styles.field}>
+            <ThemedLabel>Localisation du lieu</ThemedLabel>
+            <ThemedTextInput
+              placeholder="Ex: Paris, France"
+              value={form.location}
+              onChangeText={(t) => setForm((s) => ({ ...s, location: t }))}
             />
-          )}
-        </View>
+          </View>
 
-        <View style={styles.field}>
-          <ThemedLabel>Description / activité</ThemedLabel>
-          <ThemedTextInput
-            placeholder="Activités prévues"
-            value={form.description}
-            multiline
-            onChangeText={(t) => setForm((s) => ({ ...s, description: t }))}
-            style={{ minHeight: 100, textAlignVertical: "top" }}
+          <View style={styles.field}>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowStartPicker(true);
+              }}
+            >
+              <ThemedLabel>
+                {`Date de début: ${formatDateDisplay(
+                  parseDateOrToday(form.startDate)
+                )}`}
+              </ThemedLabel>
+            </Pressable>
+            {showStartPicker && (
+              <DateTimePicker
+                value={parseDateOrToday(form.startDate)}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={(_, d) => {
+                  if (d) setForm((s) => ({ ...s, startDate: formatDate(d) }));
+                  setShowStartPicker(false);
+                }}
+              />
+            )}
+          </View>
+
+          <View style={styles.field}>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowEndPicker(true);
+              }}
+            >
+              <ThemedLabel>
+                {`Date de fin: ${formatDateDisplay(
+                  parseDateOrToday(form.endDate)
+                )}`}
+              </ThemedLabel>
+            </Pressable>
+            {showEndPicker && (
+              <DateTimePicker
+                value={parseDateOrToday(form.endDate)}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={(_, d) => {
+                  if (d) setForm((s) => ({ ...s, endDate: formatDate(d) }));
+                  setShowEndPicker(false);
+                }}
+              />
+            )}
+          </View>
+
+          <View style={styles.field}>
+            <ThemedLabel>Description / activité</ThemedLabel>
+            <ThemedTextInput
+              placeholder="Activités prévues"
+              value={form.description}
+              multiline
+              onChangeText={(t) => setForm((s) => ({ ...s, description: t }))}
+              style={{ minHeight: 100, textAlignVertical: "top" }}
+            />
+          </View>
+
+          <ThemedButton
+            title={loading ? "Enregistrement…" : "Ajouter l'étape"}
+            onPress={handleSave}
+            disabled={loading}
           />
-        </View>
-
-        <ThemedButton
-          title={loading ? "Enregistrement…" : "Ajouter l'étape"}
-          onPress={handleSave}
-          disabled={loading}
-        />
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -210,4 +201,3 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 });
-

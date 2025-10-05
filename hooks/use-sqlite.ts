@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export type QueryParams = Array<string | number | null>;
 
@@ -10,13 +10,15 @@ export type UseSQLiteOptions = {
   onInit?: (db: SQLite.SQLiteDatabase) => Promise<void> | void; // callback après init
 };
 
-// Verrous globaux pour éviter les initialisations concurrentes par base
+// Verrous globaux pour sérialiser l'application des schémas par base
 const initPromisesByDb = new Map<string, Promise<void>>();
 const initializedDbs = new Set<string>();
 
 export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   const db = useMemo(() => SQLite.openDatabaseSync(dbName), [dbName]);
   const hasSchema = Boolean(options?.schema && options.schema.length > 0);
+  const shouldInit = hasSchema || Boolean(options?.onInit);
+  const [ready, setReady] = useState<boolean>(!shouldInit);
 
   const waitForInitIfNeeded = useCallback(async () => {
     // Si une initialisation est en cours pour cette base, attendre qu'elle se termine
@@ -70,29 +72,34 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   );
 
   const init = useCallback(async () => {
-    // Si aucune initialisation requise, sortir tôt
-    if (!hasSchema && !options?.onInit) return;
+    if (!shouldInit) return;
 
-    // Déjà initialisé pour cette base ?
-    if (initializedDbs.has(dbName)) {
-      if (options?.onInit) await options.onInit(db);
-      return;
-    }
+    // Déjà initialisée pour cette base
+    if (initializedDbs.has(dbName)) return;
 
-    // Initialisation déjà en cours ? Attendre le verrou
+    // Attendre une éventuelle initialisation en cours puis sortir
     const pending = initPromisesByDb.get(dbName);
     if (pending) {
       await pending;
-      if (options?.onInit) await options.onInit(db);
       return;
     }
 
+    // Lancer une seule initialisation concurrent-safe
     const initPromise = (async () => {
       try {
         if (hasSchema) {
-          const stmts = (options!.schema as string[]).map((sql) => ({ sql }));
-          await transaction(stmts);
+          // Exécuter les DDL sans transaction explicite pour éviter les rollback implicites
+          const sql = (options!.schema as string[])
+            .map((s) => {
+              const trimmed = s.trim();
+              return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
+            })
+            .join(" ");
+          if (sql.length > 0) {
+            await db.execAsync(sql);
+          }
         }
+        if (options?.onInit) await options.onInit(db);
         initializedDbs.add(dbName);
       } finally {
         initPromisesByDb.delete(dbName);
@@ -101,17 +108,26 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
 
     initPromisesByDb.set(dbName, initPromise);
     await initPromise;
-
-    if (options?.onInit) await options.onInit(db);
-  }, [db, dbName, hasSchema, options, transaction]);
+  }, [db, dbName, hasSchema, options, shouldInit, transaction]);
 
   useEffect(() => {
-    // Initialise la base si un schéma est fourni
-    void init();
+    let cancelled = false;
+    const run = async () => {
+      try {
+        await init();
+      } finally {
+        if (!cancelled) setReady(true);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [init]);
 
   return {
     db,
+    ready,
     run,
     queryAll,
     queryOne,

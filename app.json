@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "tp-tripflow",
-    "slug": "tp-tripflow",
+    "name": "TripFlow",
+    "slug": "TripFlow",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/iconApp.png",
-    "scheme": "tptripflow",
+    "scheme": "tripflow",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -18,9 +18,7 @@
       }
     },
     "android": {
-      "permissions": [
-        "CAMERA"
-      ],
+      "permissions": ["CAMERA"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/iconApp.png",

@@ -1,9 +1,9 @@
 import { Colors } from "@/constants/theme";
 import useSQLite from "@/hooks/use-sqlite";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as SecureStore from "expo-secure-store";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ImageBackground,
   ScrollView,
@@ -32,26 +32,7 @@ export default function HomeSlide({
   const theme = (
     colorScheme === "dark" ? "dark" : "light"
   ) as keyof typeof Colors;
-  const { queryAll, queryOne } = useSQLite("tripflow.db", {
-    schema: [
-      `CREATE TABLE IF NOT EXISTS UTILISATEUR (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        IDENTIFIANT TEXT UNIQUE NOT NULL,
-        MOT_DE_PASSE TEXT NOT NULL,
-        DATE_INSCRIPTION TEXT NOT NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS VOYAGE (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        TITRE TEXT NOT NULL,
-        DATE_ALLER TEXT NOT NULL,
-        DATE_RETOUR TEXT NOT NULL,
-        LIEU TEXT NOT NULL,
-        DESCRIPTION TEXT NOT NULL,
-        IMAGE TEXT NOT NULL,
-        ID_UTILISATEUR INTEGER NOT NULL
-      )`,
-    ],
-  });
+  const { queryAll, queryOne } = useSQLite("tripflow.db");
 
   type VoyageRow = {
     ID: number;
@@ -80,34 +61,43 @@ export default function HomeSlide({
   const getImage = (uri?: string) =>
     uri && uri.length > 0 ? uri : "https://placehold.co/800x600";
 
-  useEffect(() => {
-    const loadVoyages = async () => {
-      try {
-        const userLogin = (await SecureStore.getItemAsync("userLogin")) ?? "";
-        if (!userLogin) {
-          setVoyages([]);
-          return;
-        }
-        const user = await queryOne<{ ID: number }>(
-          "SELECT ID FROM UTILISATEUR WHERE IDENTIFIANT = ?",
-          [userLogin]
-        );
-        if (!user) {
-          setVoyages([]);
-          return;
-        }
-        const rows = await queryAll<VoyageRow>(
-          "SELECT * FROM VOYAGE WHERE ID_UTILISATEUR = ? ORDER BY DATE_ALLER DESC",
-          [user.ID]
-        );
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
 
-        setVoyages(rows);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void loadVoyages();
-  }, [queryAll, queryOne]);
+      const loadVoyages = async () => {
+        try {
+          setLoading(true);
+          const userLogin = (await SecureStore.getItemAsync("userLogin")) ?? "";
+          if (!userLogin) {
+            if (isActive) setVoyages([]);
+            return;
+          }
+          const user = await queryOne<{ ID: number }>(
+            "SELECT ID FROM UTILISATEUR WHERE IDENTIFIANT = ?",
+            [userLogin]
+          );
+          if (!user) {
+            if (isActive) setVoyages([]);
+            return;
+          }
+          const rows = await queryAll<VoyageRow>(
+            "SELECT * FROM VOYAGE WHERE ID_UTILISATEUR = ? ORDER BY DATE_ALLER DESC",
+            [user.ID]
+          );
+          if (isActive) setVoyages(rows);
+        } finally {
+          if (isActive) setLoading(false);
+        }
+      };
+
+      void loadVoyages();
+
+      return () => {
+        isActive = false;
+      };
+    }, [queryAll, queryOne])
+  );
 
   return (
     <SafeAreaView>
