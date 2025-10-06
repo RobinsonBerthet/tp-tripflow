@@ -35,9 +35,25 @@ export default function RootLayout() {
         LOCALISATION TEXT NOT NULL,
         DATE_DEBUT TEXT NOT NULL,
         DATE_FIN TEXT NOT NULL,
-        DESCRIPTION TEXT NOT NULL
+        DESCRIPTION TEXT NOT NULL,
+        LATITUDE REAL,
+        LONGITUDE REAL
       )`,
     ],
+    onInit: async (db) => {
+      // Ajouter les colonnes LATITUDE / LONGITUDE si elles n'existent pas déjà
+      const cols = await db.getAllAsync<{ name: string }>(
+        "PRAGMA table_info(ETAPE)"
+      );
+      const hasLat = cols.some((c) => c.name === "LATITUDE");
+      const hasLng = cols.some((c) => c.name === "LONGITUDE");
+      if (!hasLat) {
+        await db.execAsync("ALTER TABLE ETAPE ADD COLUMN LATITUDE REAL;");
+      }
+      if (!hasLng) {
+        await db.execAsync("ALTER TABLE ETAPE ADD COLUMN LONGITUDE REAL;");
+      }
+    },
   });
 
   if (!ready) return null;

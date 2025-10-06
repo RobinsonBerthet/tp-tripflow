@@ -4,6 +4,7 @@ import ThemedText from "@/components/atomes/ThemedText";
 import ThemedTextInput from "@/components/atomes/ThemedTextInput";
 import useSQLite from "@/hooks/use-sqlite";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
@@ -16,6 +17,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import MapView, { Marker, Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type StepForm = {
@@ -24,6 +26,8 @@ type StepForm = {
   startDate: string; // ISO yyyy-mm-dd
   endDate: string; // ISO yyyy-mm-dd
   description: string;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 export default function AddStepScreen() {
@@ -39,10 +43,18 @@ export default function AddStepScreen() {
     startDate: new Date().toISOString().slice(0, 10),
     endDate: new Date().toISOString().slice(0, 10),
     description: "",
+    latitude: null,
+    longitude: null,
   });
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mapRegion, setMapRegion] = useState<Region>({
+    latitude: 48.8566,
+    longitude: 2.3522,
+    latitudeDelta: 0.05,
+    longitudeDelta: 0.05,
+  });
 
   const formatDate = (d: Date) => d.toISOString().slice(0, 10);
   const parseDateOrToday = (v: string) => {
@@ -68,7 +80,7 @@ export default function AddStepScreen() {
     try {
       setLoading(true);
       await run(
-        "INSERT INTO ETAPE (ID_VOYAGE, NOM_LIEU, LOCALISATION, DATE_DEBUT, DATE_FIN, DESCRIPTION) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO ETAPE (ID_VOYAGE, NOM_LIEU, LOCALISATION, DATE_DEBUT, DATE_FIN, DESCRIPTION, LATITUDE, LONGITUDE) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
           voyageId,
           form.title,
@@ -76,14 +88,57 @@ export default function AddStepScreen() {
           form.startDate,
           form.endDate,
           form.description,
+          form.latitude,
+          form.longitude,
         ]
       );
       router.back();
-    } catch (e) {
+    } catch {
       Alert.alert("Erreur", "Impossible d'enregistrer l'étape.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const geocodeAddress = async () => {
+    if (!form.location.trim()) {
+      Alert.alert("Adresse manquante", "Saisissez une localisation.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const results = await Location.geocodeAsync(form.location);
+      if (!results || results.length === 0) {
+        Alert.alert("Introuvable", "Adresse non trouvée.");
+        return;
+      }
+      const best = results[0];
+      if (
+        typeof best.latitude === "number" &&
+        typeof best.longitude === "number"
+      ) {
+        setForm((s) => ({
+          ...s,
+          latitude: best.latitude,
+          longitude: best.longitude,
+        }));
+        setMapRegion({
+          latitude: best.latitude,
+          longitude: best.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+      }
+    } catch {
+      Alert.alert("Erreur", "Géocodage impossible.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const setFromMap = async (lat: number, lng: number) => {
+    setForm((s) => ({ ...s, latitude: lat, longitude: lng }));
+    setMapRegion((r) => ({ ...r, latitude: lat, longitude: lng }));
   };
 
   return (
@@ -111,6 +166,44 @@ export default function AddStepScreen() {
               value={form.location}
               onChangeText={(t) => setForm((s) => ({ ...s, location: t }))}
             />
+            <View style={{ marginTop: 8 }}>
+              <ThemedButton
+                title={loading ? "Recherche…" : "Géocoder l'adresse"}
+                onPress={geocodeAddress}
+                disabled={loading}
+              />
+            </View>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <ThemedLabel>Position sur la carte</ThemedLabel>
+            <MapView
+              style={{ width: "100%", height: 220, borderRadius: 8 }}
+              initialRegion={mapRegion}
+              region={mapRegion}
+              onPress={(e) => {
+                const { latitude, longitude } = e.nativeEvent.coordinate;
+                void setFromMap(latitude, longitude);
+              }}
+            >
+              {typeof form.latitude === "number" &&
+                typeof form.longitude === "number" && (
+                  <Marker
+                    coordinate={{
+                      latitude: form.latitude,
+                      longitude: form.longitude,
+                    }}
+                  />
+                )}
+            </MapView>
+            {typeof form.latitude === "number" &&
+              typeof form.longitude === "number" && (
+                <ThemedText>
+                  {`Lat: ${form.latitude.toFixed(
+                    6
+                  )}  Lng: ${form.longitude.toFixed(6)}`}
+                </ThemedText>
+              )}
           </View>
 
           <View style={styles.field}>
