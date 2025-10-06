@@ -1,6 +1,7 @@
 import BottomNavbar from "@/components/organisms/BottomNavbar";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useTravelStore } from "@/stores/travelStore";
 import React, { useEffect, useState } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import Animated, {
@@ -19,6 +20,7 @@ export default function HomeScreen() {
   const [selectedTab, setSelectedTab] = useState<"home" | "voyages" | "profil">(
     "home"
   );
+  const { selectedVoyageId } = useTravelStore();
 
   const { width } = Dimensions.get("screen");
   const translateX = useSharedValue(0);
@@ -33,6 +35,12 @@ export default function HomeScreen() {
   const slidesStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }));
+
+  useEffect(() => {
+    if (selectedVoyageId) {
+      setSelectedTab("voyages");
+    }
+  }, [selectedVoyageId]);
 
   return (
     <View

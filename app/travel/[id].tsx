@@ -1,6 +1,7 @@
 import { ThemedButton } from "@/components/atomes/ThemedButton";
 import ThemedText from "@/components/atomes/ThemedText";
 import useSQLite from "@/hooks/use-sqlite";
+import { useTravelStore } from "@/stores/travelStore";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -44,6 +45,7 @@ export default function TravelDetailScreen() {
   const [voyage, setVoyage] = useState<VoyageRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [steps, setSteps] = useState<StepRow[]>([]);
+  const { setSelectedVoyageId } = useTravelStore();
 
   const formatDateDisplay = (iso: string) => {
     if (!iso) return "";
@@ -101,7 +103,7 @@ export default function TravelDetailScreen() {
         onPress: async () => {
           try {
             await run("DELETE FROM VOYAGE WHERE ID = ?", [voyage.ID]);
-            router.replace("/home");
+            router.back();
           } catch {
             Alert.alert("Erreur", "La suppression a échoué.");
           }
@@ -242,6 +244,14 @@ export default function TravelDetailScreen() {
         )}
 
         <View style={styles.actions}>
+          <ThemedButton
+            title="Visualiser sur la carte"
+            onPress={async () => {
+              setSelectedVoyageId(voyage.ID);
+              router.back();
+            }}
+            style={{ marginBottom: 8, paddingVertical: 14 }}
+          />
           <ThemedButton
             title="Supprimer le voyage"
             onPress={handleDelete}
