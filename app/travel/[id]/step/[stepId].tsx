@@ -3,6 +3,7 @@ import ThemedLabel from "@/components/atomes/ThemedLabel";
 import ThemedText from "@/components/atomes/ThemedText";
 import ThemedTextInput from "@/components/atomes/ThemedTextInput";
 import useSQLite from "@/hooks/use-sqlite";
+import { useTravelStore } from "@/stores/travelStore";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
@@ -55,6 +56,8 @@ export default function EditStepScreen() {
       )`,
     ],
   });
+
+  const { bumpStepsVersion } = useTravelStore();
 
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
@@ -137,6 +140,9 @@ export default function EditStepScreen() {
           voyageId,
         ]
       );
+      try {
+        bumpStepsVersion();
+      } catch {}
       router.back();
     } catch {
       Alert.alert("Erreur", "Impossible d'enregistrer les modifications.");
@@ -193,6 +199,9 @@ export default function EditStepScreen() {
               stepId,
               voyageId,
             ]);
+            try {
+              bumpStepsVersion();
+            } catch {}
             router.back();
           } catch {
             Alert.alert("Erreur", "Suppression impossible.");

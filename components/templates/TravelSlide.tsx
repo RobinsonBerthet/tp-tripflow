@@ -39,7 +39,7 @@ export default function TravelSlide({
   const mapRef = useRef<MapView | null>(null);
   const [heading, setHeading] = useState<number>(0);
   const { queryAll } = useSQLite("tripflow.db");
-  const { selectedVoyageId } = useTravelStore();
+  const { selectedVoyageId, stepsVersion } = useTravelStore();
   const [stepPoints, setStepPoints] = useState<
     { id: number; title: string; latitude: number; longitude: number }[]
   >([]);
@@ -177,7 +177,7 @@ export default function TravelSlide({
     return () => {
       cancelled = true;
     };
-  }, [selectedVoyageId, queryAll]);
+  }, [selectedVoyageId, queryAll, stepsVersion]);
   const centerOnUser = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();

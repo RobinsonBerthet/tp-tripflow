@@ -45,7 +45,7 @@ export default function TravelDetailScreen() {
   const [voyage, setVoyage] = useState<VoyageRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [steps, setSteps] = useState<StepRow[]>([]);
-  const { setSelectedVoyageId } = useTravelStore();
+  const { setSelectedVoyageId, navigateToVoyages } = useTravelStore();
 
   const formatDateDisplay = (iso: string) => {
     if (!iso) return "";
@@ -248,6 +248,7 @@ export default function TravelDetailScreen() {
             title="Visualiser sur la carte"
             onPress={async () => {
               setSelectedVoyageId(voyage.ID);
+              navigateToVoyages();
               router.back();
             }}
             style={{ marginBottom: 8, paddingVertical: 14 }}

@@ -20,7 +20,7 @@ export default function HomeScreen() {
   const [selectedTab, setSelectedTab] = useState<"home" | "voyages" | "profil">(
     "home"
   );
-  const { selectedVoyageId } = useTravelStore();
+  const { selectedVoyageId, navigateToVoyagesTick } = useTravelStore();
 
   const { width } = Dimensions.get("screen");
   const translateX = useSharedValue(0);
@@ -41,6 +41,13 @@ export default function HomeScreen() {
       setSelectedTab("voyages");
     }
   }, [selectedVoyageId]);
+
+  useEffect(() => {
+    // Forcer l'onglet voyages même si selectedVoyageId ne change pas
+    if (navigateToVoyagesTick >= 0) {
+      setSelectedTab("voyages");
+    }
+  }, [navigateToVoyagesTick]);
 
   return (
     <View
