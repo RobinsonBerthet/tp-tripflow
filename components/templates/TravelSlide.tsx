@@ -38,7 +38,7 @@ export default function TravelSlide({
   const colorScheme = useColorScheme() ?? "light";
   const mapRef = useRef<MapView | null>(null);
   const [heading, setHeading] = useState<number>(0);
-  const { queryAll } = useSQLite("tripflow.db");
+  const { queryAll, run, ready } = useSQLite("tripflow.db");
   const { selectedVoyageId, stepsVersion } = useTravelStore();
   const [stepPoints, setStepPoints] = useState<
     { id: number; title: string; latitude: number; longitude: number }[]
@@ -127,7 +127,7 @@ export default function TravelSlide({
   useEffect(() => {
     let cancelled = false;
     const loadSteps = async () => {
-      if (!selectedVoyageId) {
+      if (!ready || !selectedVoyageId) {
         setStepPoints([]);
         return;
       }
@@ -136,29 +136,69 @@ export default function TravelSlide({
           ID: number;
           ID_VOYAGE: number;
           NOM_LIEU: string;
+          LOCALISATION: string;
           LATITUDE: number | null;
           LONGITUDE: number | null;
           DATE_DEBUT: string;
         };
         const rows = await queryAll<StepRow>(
-          "SELECT ID, ID_VOYAGE, NOM_LIEU, LATITUDE, LONGITUDE, DATE_DEBUT FROM ETAPE WHERE ID_VOYAGE = ? ORDER BY DATE_DEBUT ASC",
+          "SELECT ID, ID_VOYAGE, NOM_LIEU, LOCALISATION, LATITUDE, LONGITUDE, DATE_DEBUT FROM ETAPE WHERE ID_VOYAGE = ? ORDER BY DATE_DEBUT ASC",
           [selectedVoyageId]
         );
         if (cancelled) return;
-        const points = rows
-          .filter(
-            (r) =>
-              typeof r.LATITUDE === "number" &&
-              typeof r.LONGITUDE === "number" &&
-              isFinite(r.LATITUDE) &&
-              isFinite(r.LONGITUDE)
-          )
-          .map((r) => ({
-            id: r.ID,
-            title: r.NOM_LIEU,
-            latitude: r.LATITUDE as number,
-            longitude: r.LONGITUDE as number,
-          }));
+        const points: {
+          id: number;
+          title: string;
+          latitude: number;
+          longitude: number;
+        }[] = [];
+
+        for (const r of rows) {
+          if (cancelled) return;
+          const hasCoords =
+            typeof r.LATITUDE === "number" &&
+            typeof r.LONGITUDE === "number" &&
+            isFinite(r.LATITUDE) &&
+            isFinite(r.LONGITUDE);
+          if (hasCoords) {
+            points.push({
+              id: r.ID,
+              title: r.NOM_LIEU,
+              latitude: r.LATITUDE as number,
+              longitude: r.LONGITUDE as number,
+            });
+            continue;
+          }
+          // Fallback: géocoder la localisation si absente des coordonnées
+          const loc = (r.LOCALISATION ?? "").trim();
+          if (loc.length > 0) {
+            try {
+              const res = await Location.geocodeAsync(loc);
+              if (cancelled) return;
+              if (res && res.length > 0) {
+                const g = res[0];
+                if (
+                  typeof g.latitude === "number" &&
+                  typeof g.longitude === "number"
+                ) {
+                  points.push({
+                    id: r.ID,
+                    title: r.NOM_LIEU,
+                    latitude: g.latitude,
+                    longitude: g.longitude,
+                  });
+                  // Persister les coordonnées pour éviter de régéocoder
+                  try {
+                    await run(
+                      "UPDATE ETAPE SET LATITUDE = ?, LONGITUDE = ? WHERE ID = ? AND ID_VOYAGE = ?",
+                      [g.latitude, g.longitude, r.ID, selectedVoyageId]
+                    );
+                  } catch {}
+                }
+              }
+            } catch {}
+          }
+        }
         setStepPoints(points);
 
         if (points.length > 0) {
@@ -177,7 +217,7 @@ export default function TravelSlide({
     return () => {
       cancelled = true;
     };
-  }, [selectedVoyageId, queryAll, stepsVersion]);
+  }, [selectedVoyageId, queryAll, run, stepsVersion, ready]);
   const centerOnUser = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();

@@ -3,6 +3,7 @@ import ThemedLabel from "@/components/atomes/ThemedLabel";
 import ThemedText from "@/components/atomes/ThemedText";
 import ThemedTextInput from "@/components/atomes/ThemedTextInput";
 import useSQLite from "@/hooks/use-sqlite";
+import { useTravelStore } from "@/stores/travelStore";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
@@ -36,6 +37,7 @@ export default function AddStepScreen() {
   const voyageId = useMemo(() => Number(idParam), [idParam]);
 
   const { run } = useSQLite("tripflow.db");
+  const { bumpStepsVersion } = useTravelStore();
 
   const [form, setForm] = useState<StepForm>({
     title: "",
@@ -79,6 +81,40 @@ export default function AddStepScreen() {
     }
     try {
       setLoading(true);
+      let lat = form.latitude;
+      let lng = form.longitude;
+      if (lat == null || lng == null) {
+        try {
+          const results = await Location.geocodeAsync(form.location);
+          if (!results || results.length === 0) {
+            Alert.alert(
+              "Localisation manquante",
+              "Géocodez l'adresse ou choisissez un point sur la carte."
+            );
+            return;
+          }
+          const best = results[0];
+          if (
+            typeof best.latitude === "number" &&
+            typeof best.longitude === "number"
+          ) {
+            lat = best.latitude;
+            lng = best.longitude;
+          } else {
+            Alert.alert(
+              "Localisation invalide",
+              "Impossible de déterminer des coordonnées valides."
+            );
+            return;
+          }
+        } catch {
+          Alert.alert(
+            "Erreur",
+            "Géocodage impossible. Sélectionnez un point sur la carte."
+          );
+          return;
+        }
+      }
       await run(
         "INSERT INTO ETAPE (ID_VOYAGE, NOM_LIEU, LOCALISATION, DATE_DEBUT, DATE_FIN, DESCRIPTION, LATITUDE, LONGITUDE) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
@@ -88,10 +124,13 @@ export default function AddStepScreen() {
           form.startDate,
           form.endDate,
           form.description,
-          form.latitude,
-          form.longitude,
+          lat,
+          lng,
         ]
       );
+      try {
+        bumpStepsVersion();
+      } catch {}
       router.back();
     } catch {
       Alert.alert("Erreur", "Impossible d'enregistrer l'étape.");

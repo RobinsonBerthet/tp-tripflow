@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type QueryParams = Array<string | number | null>;
 
@@ -12,13 +12,21 @@ export type UseSQLiteOptions = {
 
 // Verrous globaux pour sérialiser l'application des schémas par base
 const initPromisesByDb = new Map<string, Promise<void>>();
-const initializedDbs = new Set<string>();
+
+// Normalise les paramètres passés aux requêtes pour éviter les undefined côté natif
+function normalizeParams(
+  params: Array<unknown>
+): Array<string | number | null> {
+  return params.map((p) => (p === undefined ? null : (p as any))) as Array<
+    string | number | null
+  >;
+}
 
 export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
-  const db = useMemo(() => SQLite.openDatabaseSync(dbName), [dbName]);
+  const dbRef = useRef<SQLite.SQLiteDatabase | null>(null);
   const hasSchema = Boolean(options?.schema && options.schema.length > 0);
   const shouldInit = hasSchema || Boolean(options?.onInit);
-  const [ready, setReady] = useState<boolean>(!shouldInit);
+  const [ready, setReady] = useState<boolean>(false);
 
   const waitForInitIfNeeded = useCallback(async () => {
     // Si une initialisation est en cours pour cette base, attendre qu'elle se termine
@@ -31,52 +39,55 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   const run = useCallback(
     async (sql: string, params: QueryParams = []) => {
       await waitForInitIfNeeded();
-      const res = await db.runAsync(sql, params);
+      const db = dbRef.current;
+      if (!db) throw new Error("Database not initialized");
+      const res = await db.runAsync(sql, normalizeParams(params));
       return {
         rowsAffected: res.changes,
         insertId: (res as any).lastInsertRowId as number | undefined,
       };
     },
-    [db, waitForInitIfNeeded]
+    [waitForInitIfNeeded]
   );
 
   const queryAll = useCallback(
     async <T = any>(sql: string, params: QueryParams = []) => {
       await waitForInitIfNeeded();
-      const rows = await db.getAllAsync<T>(sql, params);
+      const db = dbRef.current;
+      if (!db) throw new Error("Database not initialized");
+      const rows = await db.getAllAsync<T>(sql, normalizeParams(params));
       return rows;
     },
-    [db, waitForInitIfNeeded]
+    [waitForInitIfNeeded]
   );
 
   const queryOne = useCallback(
     async <T = any>(sql: string, params: QueryParams = []) => {
       await waitForInitIfNeeded();
-      const row = await db.getFirstAsync<T>(sql, params);
+      const db = dbRef.current;
+      if (!db) throw new Error("Database not initialized");
+      const row = await db.getFirstAsync<T>(sql, normalizeParams(params));
       return (row ?? null) as T | null;
     },
-    [db, waitForInitIfNeeded]
+    [waitForInitIfNeeded]
   );
 
   const transaction = useCallback(
     async (statements: SQLStatement[]): Promise<void> => {
       // Transaction peut être utilisée par l'init elle-même. Éviter d'attendre ici
       // pour ne pas créer de deadlock si déjà dans l'init.
+      const db = dbRef.current;
+      if (!db) throw new Error("Database not initialized");
       await db.withTransactionAsync(async () => {
         for (const { sql, params } of statements) {
-          await db.runAsync(sql, params ?? []);
+          await db.runAsync(sql, normalizeParams(params ?? []));
         }
       });
     },
-    [db]
+    []
   );
 
   const init = useCallback(async () => {
-    if (!shouldInit) return;
-
-    // Déjà initialisée pour cette base
-    if (initializedDbs.has(dbName)) return;
-
     // Attendre une éventuelle initialisation en cours puis sortir
     const pending = initPromisesByDb.get(dbName);
     if (pending) {
@@ -87,20 +98,21 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
     // Lancer une seule initialisation concurrent-safe
     const initPromise = (async () => {
       try {
-        if (hasSchema) {
-          // Exécuter les DDL sans transaction explicite pour éviter les rollback implicites
-          const sql = (options!.schema as string[])
-            .map((s) => {
-              const trimmed = s.trim();
-              return trimmed.endsWith(";") ? trimmed : `${trimmed};`;
-            })
-            .join(" ");
-          if (sql.length > 0) {
-            await db.execAsync(sql);
+        // Ouvrir une nouvelle connexion explicitement pour contourner les soucis Android
+        const openedDb = await SQLite.openDatabaseAsync(dbName, {
+          useNewConnection: true,
+        } as any);
+        dbRef.current = openedDb;
+
+        if (hasSchema && options?.schema) {
+          for (const stmt of options.schema) {
+            const trimmed = stmt.trim();
+            if (trimmed.length === 0) continue;
+            const sql = trimmed.endsWith(";") ? trimmed : `${trimmed};`;
+            await openedDb.execAsync(sql);
           }
         }
-        if (options?.onInit) await options.onInit(db);
-        initializedDbs.add(dbName);
+        if (options?.onInit) await options.onInit(openedDb);
       } finally {
         initPromisesByDb.delete(dbName);
       }
@@ -108,7 +120,7 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
 
     initPromisesByDb.set(dbName, initPromise);
     await initPromise;
-  }, [db, dbName, hasSchema, options, shouldInit, transaction]);
+  }, [dbName, hasSchema, options]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,7 +138,7 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
   }, [init]);
 
   return {
-    db,
+    db: dbRef.current as SQLite.SQLiteDatabase | null,
     ready,
     run,
     queryAll,
