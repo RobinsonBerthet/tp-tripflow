@@ -42,6 +42,7 @@ export default function TravelSlide({
   const mapRef = useRef<MapView | null>(null);
   const [heading, setHeading] = useState<number>(0);
   const [markerTracksViewChanges, setMarkerTracksViewChanges] = useState(true);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
   const { queryAll, run, ready } = useSQLite("tripflow.db");
   const { selectedVoyageId, stepsVersion } = useTravelStore();
   const [stepPoints, setStepPoints] = useState<
@@ -135,6 +136,32 @@ export default function TravelSlide({
     const t = setTimeout(() => setMarkerTracksViewChanges(false), 1200);
     return () => clearTimeout(t);
   }, [stepPoints.length, mapType, colorScheme]);
+
+  // Forcer un léger rafraîchissement quand la sélection change pour garantir l'affichage
+  useEffect(() => {
+    if (selectedEdgeId != null) {
+      setMarkerTracksViewChanges(true);
+      const t = setTimeout(() => setMarkerTracksViewChanges(false), 500);
+      return () => clearTimeout(t);
+    }
+  }, [selectedEdgeId]);
+
+  const focusOnStep = (
+    point: { latitude: number; longitude: number },
+    animateMs = 400
+  ) => {
+    try {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: point.latitude,
+          longitude: point.longitude,
+          latitudeDelta: 0.004,
+          longitudeDelta: 0.004,
+        },
+        animateMs
+      );
+    } catch {}
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -300,6 +327,9 @@ export default function TravelSlide({
         showsMyLocationButton={false}
         showsUserLocation={true}
         showsCompass={false}
+        toolbarEnabled={false} // Android: cache la barre d'outils (itinéraire)
+        zoomControlEnabled={false} // Android: cache les boutons + / -
+        showsScale={false} // iOS: cache l'échelle
         onMapReady={() => {
           mapRef.current
             ?.getCamera()
@@ -318,6 +348,7 @@ export default function TravelSlide({
             })
             .catch(() => {});
         }}
+        onPress={() => setSelectedEdgeId(null)}
         initialRegion={{
           latitude: 37.78825,
           longitude: -122.4324,
@@ -337,8 +368,48 @@ export default function TravelSlide({
               tracksViewChanges={markerTracksViewChanges}
               title={p.title}
               description={`Étape ${idx + 1}`}
+              onPress={() => {
+                focusOnStep(
+                  { latitude: p.latitude, longitude: p.longitude },
+                  450
+                );
+                setSelectedEdgeId(p.id);
+              }}
             >
-              <SvgIcon Icon={MarkerIcon} size={34} color={markerColor} />
+              <View style={styles.markerContainer}>
+                <SvgIcon Icon={MarkerIcon} size={34} color={markerColor} />
+                {selectedEdgeId === p.id ? (
+                  <View style={styles.bubbleWrapper} pointerEvents="none">
+                    <View
+                      style={[
+                        styles.calloutBubble,
+                        { backgroundColor: Colors[theme].background },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.calloutTitle, { color: markerColor }]}
+                      >
+                        {idx === 0 ? "Départ" : "Arrivée"}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.calloutSubtitle,
+                          { color: Colors[theme].text },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {p.title}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.calloutArrow,
+                        { borderTopColor: Colors[theme].background },
+                      ]}
+                    />
+                  </View>
+                ) : null}
+              </View>
             </Marker>
           );
         })}
@@ -380,17 +451,16 @@ export default function TravelSlide({
         {stepPoints.map((p, idx) => (
           <ThemedTouchable
             key={`stepname-${p.id}`}
-            onPress={() =>
-              mapRef.current?.animateToRegion(
-                {
-                  latitude: p.latitude,
-                  longitude: p.longitude,
-                  latitudeDelta: 0.01,
-                  longitudeDelta: 0.01,
-                },
-                500
-              )
-            }
+            onPress={() => {
+              focusOnStep(
+                { latitude: p.latitude, longitude: p.longitude },
+                450
+              );
+              const idxInList = stepPoints.findIndex((sp) => sp.id === p.id);
+              const isEdgeLocal =
+                idxInList === 0 || idxInList === stepPoints.length - 1;
+              setSelectedEdgeId(isEdgeLocal ? p.id : null);
+            }}
             style={{ paddingHorizontal: 10, paddingVertical: 6 }}
           >
             <Text style={[styles.stepItem, { color: Colors[theme].text }]}>
@@ -526,7 +596,48 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "blue",
   },
+  calloutContainer: {
+    alignItems: "center",
+  },
+  calloutBubble: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    maxWidth: 220,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+  },
+  calloutTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  calloutSubtitle: {
+    fontSize: 12,
+  },
+  calloutArrow: {
+    width: 0,
+    height: 0,
+    marginTop: -1,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 10,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
   markerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  bubbleWrapper: {
+    position: "absolute",
+    bottom: 38, // juste au-dessus du marker (34) avec un petit espace
     alignItems: "center",
   },
   markerBubble: {
