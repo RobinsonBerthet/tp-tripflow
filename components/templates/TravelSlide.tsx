@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
   ViewProps,
@@ -22,6 +23,7 @@ import MapView, {
 } from "react-native-maps";
 import { Colors } from "../../constants/theme";
 import SvgIcon from "../atomes/SvgIcon";
+import ThemedTouchable from "../atomes/ThemedTouchable";
 
 export type TravelSlideProps = ViewProps & {
   title?: string;
@@ -43,6 +45,7 @@ export default function TravelSlide({
   const [stepPoints, setStepPoints] = useState<
     { id: number; title: string; latitude: number; longitude: number }[]
   >([]);
+  const stepOrderRef = useRef<Record<number, number>>({});
 
   const darkMapStyle = [
     {
@@ -127,9 +130,12 @@ export default function TravelSlide({
   useEffect(() => {
     let cancelled = false;
     const loadSteps = async () => {
-      if (!ready || !selectedVoyageId) {
+      if (!selectedVoyageId) {
         setStepPoints([]);
         return;
+      }
+      if (!ready) {
+        return; // attendre la DB sans vider l'affichage actuel
       }
       try {
         type StepRow = {
@@ -143,15 +149,24 @@ export default function TravelSlide({
         };
         const rows = await queryAll<StepRow>(
           "SELECT ID, ID_VOYAGE, NOM_LIEU, LOCALISATION, LATITUDE, LONGITUDE, DATE_DEBUT FROM ETAPE WHERE ID_VOYAGE = ? ORDER BY DATE_DEBUT ASC",
-          [selectedVoyageId]
+          [Number(selectedVoyageId)]
         );
+
         if (cancelled) return;
-        const points: {
+        // mémoriser l'ordre pour conserver le tri chronologique
+        const order: Record<number, number> = {};
+        rows.forEach((r, i) => {
+          order[r.ID] = i;
+        });
+        stepOrderRef.current = order;
+
+        const withCoords: {
           id: number;
           title: string;
           latitude: number;
           longitude: number;
         }[] = [];
+        const toGeocode: StepRow[] = [];
 
         for (const r of rows) {
           if (cancelled) return;
@@ -161,56 +176,74 @@ export default function TravelSlide({
             isFinite(r.LATITUDE) &&
             isFinite(r.LONGITUDE);
           if (hasCoords) {
-            points.push({
+            withCoords.push({
               id: r.ID,
               title: r.NOM_LIEU,
               latitude: r.LATITUDE as number,
               longitude: r.LONGITUDE as number,
             });
-            continue;
+          } else {
+            toGeocode.push(r);
           }
-          // Fallback: géocoder la localisation si absente des coordonnées
+        }
+
+        // Afficher immédiatement ce qui a déjà des coordonnées
+        const sortByOrder = (a: { id: number }, b: { id: number }) =>
+          (stepOrderRef.current[a.id] ?? 0) - (stepOrderRef.current[b.id] ?? 0);
+        setStepPoints([...withCoords].sort(sortByOrder));
+
+        // Lancer le géocodage en arrière-plan et mettre à jour progressivement
+        for (const r of toGeocode) {
+          if (cancelled) return;
           const loc = (r.LOCALISATION ?? "").trim();
-          if (loc.length > 0) {
+          if (loc.length === 0) continue;
+          try {
+            const res = await Location.geocodeAsync(loc);
+            if (cancelled) return;
+            const g = res?.[0];
+            if (
+              g &&
+              typeof g.latitude === "number" &&
+              typeof g.longitude === "number"
+            ) {
+              const newPoint = {
+                id: r.ID,
+                title: r.NOM_LIEU,
+                latitude: g.latitude,
+                longitude: g.longitude,
+              };
+              setStepPoints((prev) => {
+                const next = [...prev, newPoint].sort(sortByOrder);
+                return next;
+              });
+              try {
+                await run(
+                  "UPDATE ETAPE SET LATITUDE = ?, LONGITUDE = ? WHERE ID = ? AND ID_VOYAGE = ?",
+                  [g.latitude, g.longitude, r.ID, Number(selectedVoyageId)]
+                );
+              } catch {}
+            }
+          } catch {}
+        }
+
+        // Ajuster la vue sur l'ensemble des points si disponibles
+        const finalPoints = withCoords.concat();
+        // Les points géocodés ont déjà été ajoutés via setStepPoints progressif
+        const current = finalPoints.length > 0 ? finalPoints : [];
+        if (!cancelled) {
+          const snapshot = current.length > 0 ? current : [];
+          if (snapshot.length > 0) {
             try {
-              const res = await Location.geocodeAsync(loc);
-              if (cancelled) return;
-              if (res && res.length > 0) {
-                const g = res[0];
-                if (
-                  typeof g.latitude === "number" &&
-                  typeof g.longitude === "number"
-                ) {
-                  points.push({
-                    id: r.ID,
-                    title: r.NOM_LIEU,
-                    latitude: g.latitude,
-                    longitude: g.longitude,
-                  });
-                  // Persister les coordonnées pour éviter de régéocoder
-                  try {
-                    await run(
-                      "UPDATE ETAPE SET LATITUDE = ?, LONGITUDE = ? WHERE ID = ? AND ID_VOYAGE = ?",
-                      [g.latitude, g.longitude, r.ID, selectedVoyageId]
-                    );
-                  } catch {}
-                }
-              }
+              mapRef.current?.fitToCoordinates(snapshot, {
+                edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
+                animated: true,
+              } as any);
             } catch {}
           }
         }
-        setStepPoints(points);
-
-        if (points.length > 0) {
-          try {
-            mapRef.current?.fitToCoordinates(points, {
-              edgePadding: { top: 80, right: 80, bottom: 80, left: 80 },
-              animated: true,
-            } as any);
-          } catch {}
-        }
-      } catch {
-        setStepPoints([]);
+      } catch (e) {
+        console.warn("Erreur lors du chargement des étapes:", e);
+        // En cas d'erreur, ne pas vider brutalement pour éviter le clignotement
       }
     };
     void loadSteps();
@@ -218,6 +251,7 @@ export default function TravelSlide({
       cancelled = true;
     };
   }, [selectedVoyageId, queryAll, run, stepsVersion, ready]);
+
   const centerOnUser = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -303,6 +337,34 @@ export default function TravelSlide({
       </MapView>
       <View
         style={[
+          styles.stepsListContainer,
+          { backgroundColor: Colors[theme].background },
+        ]}
+      >
+        {stepPoints.map((p, idx) => (
+          <ThemedTouchable
+            key={`stepname-${p.id}`}
+            onPress={() =>
+              mapRef.current?.animateToRegion(
+                {
+                  latitude: p.latitude,
+                  longitude: p.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                },
+                500
+              )
+            }
+            style={{ paddingHorizontal: 10, paddingVertical: 6 }}
+          >
+            <Text style={[styles.stepItem, { color: Colors[theme].text }]}>
+              {idx + 1}. {p.title}
+            </Text>
+          </ThemedTouchable>
+        ))}
+      </View>
+      <View
+        style={[
           styles.buttonsContainer,
           { backgroundColor: Colors[theme].background },
         ]}
@@ -359,6 +421,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: "3%",
     paddingVertical: "5%",
     borderRadius: 30,
+  },
+  stepsListContainer: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    gap: 6,
+    paddingHorizontal: "3%",
+    paddingVertical: "5%",
+    borderRadius: 12,
+    maxWidth: "60%",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  stepItem: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   compassDial: {
     width: 24,

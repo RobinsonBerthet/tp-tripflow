@@ -12,6 +12,8 @@ export type UseSQLiteOptions = {
 
 // Verrous globaux pour sérialiser l'application des schémas par base
 const initPromisesByDb = new Map<string, Promise<void>>();
+// Connexions partagées par nom de base pour réutiliser la même instance entre hooks
+const dbByName = new Map<string, SQLite.SQLiteDatabase>();
 
 // Normalise les paramètres passés aux requêtes pour éviter les undefined côté natif
 function normalizeParams(
@@ -33,6 +35,11 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
     const pending = initPromisesByDb.get(dbName);
     if (pending) {
       await pending;
+    }
+    // Après attente, tenter de récupérer la connexion partagée
+    if (!dbRef.current) {
+      const shared = dbByName.get(dbName) ?? null;
+      if (shared) dbRef.current = shared;
     }
   }, [dbName]);
 
@@ -92,6 +99,9 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
     const pending = initPromisesByDb.get(dbName);
     if (pending) {
       await pending;
+      // Après une init déjà en cours, attacher la connexion partagée si dispo
+      const shared = dbByName.get(dbName) ?? null;
+      dbRef.current = shared;
       return;
     }
 
@@ -103,6 +113,7 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
           useNewConnection: true,
         } as any);
         dbRef.current = openedDb;
+        dbByName.set(dbName, openedDb);
 
         if (hasSchema && options?.schema) {
           for (const stmt of options.schema) {
@@ -124,18 +135,22 @@ export function useSQLite(dbName = "tripflow.db", options?: UseSQLiteOptions) {
 
   useEffect(() => {
     let cancelled = false;
-    const run = async () => {
+    const runInit = async () => {
       try {
         await init();
+      } catch (e) {
+        console.warn("SQLite init failed:", e);
       } finally {
-        if (!cancelled) setReady(true);
+        const shared = dbByName.get(dbName) ?? null;
+        if (!dbRef.current && shared) dbRef.current = shared;
+        if (!cancelled) setReady(Boolean(dbRef.current));
       }
     };
-    void run();
+    void runInit();
     return () => {
       cancelled = true;
     };
-  }, [init]);
+  }, [init, dbName]);
 
   return {
     db: dbRef.current as SQLite.SQLiteDatabase | null,
