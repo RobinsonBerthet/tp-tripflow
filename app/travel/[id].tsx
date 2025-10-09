@@ -45,12 +45,7 @@ export default function TravelDetailScreen() {
   const [voyage, setVoyage] = useState<VoyageRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [steps, setSteps] = useState<StepRow[]>([]);
-  const { setSelectedVoyageId, selectedVoyageId, setSelectedTab } =
-    useTravelStore();
-
-  useEffect(() => {
-    console.log(selectedVoyageId);
-  }, [selectedVoyageId]);
+  const { setSelectedVoyageId, setSelectedTab } = useTravelStore();
 
   const formatDateDisplay = (iso: string) => {
     if (!iso) return "";

@@ -1,5 +1,6 @@
 import CompassIcon from "@/assets/images/svg-images/compass.svg";
 import StandardIcon from "@/assets/images/svg-images/map.svg";
+import MarkerIcon from "@/assets/images/svg-images/marker.svg";
 import SatelliteIcon from "@/assets/images/svg-images/satellite.svg";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import useSQLite from "@/hooks/use-sqlite";
@@ -40,6 +41,7 @@ export default function TravelSlide({
   const colorScheme = useColorScheme() ?? "light";
   const mapRef = useRef<MapView | null>(null);
   const [heading, setHeading] = useState<number>(0);
+  const [markerTracksViewChanges, setMarkerTracksViewChanges] = useState(true);
   const { queryAll, run, ready } = useSQLite("tripflow.db");
   const { selectedVoyageId, stepsVersion } = useTravelStore();
   const [stepPoints, setStepPoints] = useState<
@@ -126,6 +128,13 @@ export default function TravelSlide({
 
     void initLocation();
   }, []);
+
+  // Laisser les Marker suivre les changements brièvement pour laisser le SVG se rendre correctement
+  useEffect(() => {
+    setMarkerTracksViewChanges(true);
+    const t = setTimeout(() => setMarkerTracksViewChanges(false), 1200);
+    return () => clearTimeout(t);
+  }, [stepPoints.length, mapType, colorScheme]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,23 +325,50 @@ export default function TravelSlide({
           longitudeDelta: 0.0121,
         }}
       >
-        {stepPoints.map((p, idx) => (
-          <Marker
-            key={`step-${p.id}`}
-            coordinate={{ latitude: p.latitude, longitude: p.longitude }}
-            title={p.title}
-            description={`Étape ${idx + 1}`}
-          />
-        ))}
+        {stepPoints.map((p, idx) => {
+          const isEdge = idx === 0 || idx === stepPoints.length - 1;
+          if (!isEdge) return null;
+          const markerColor = idx === 0 ? "#e53935" : "#43a047"; // rouge départ, vert arrivée
+          return (
+            <Marker
+              key={`step-${p.id}`}
+              coordinate={{ latitude: p.latitude, longitude: p.longitude }}
+              anchor={{ x: 0.5, y: 1 }}
+              tracksViewChanges={markerTracksViewChanges}
+              title={p.title}
+              description={`Étape ${idx + 1}`}
+            >
+              <SvgIcon Icon={MarkerIcon} size={34} color={markerColor} />
+            </Marker>
+          );
+        })}
         {stepPoints.length >= 2 ? (
-          <Polyline
-            coordinates={stepPoints.map((p) => ({
-              latitude: p.latitude,
-              longitude: p.longitude,
-            }))}
-            strokeColor={colorScheme === "dark" ? "#90caf9" : "#1976d2"}
-            strokeWidth={3}
-          />
+          <>
+            {/* Large outline for better contrast on any background */}
+            <Polyline
+              coordinates={stepPoints.map((p) => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+              }))}
+              strokeColor={
+                colorScheme === "dark"
+                  ? "rgba(0,0,0,0.6)"
+                  : "rgba(255,255,255,0.9)"
+              }
+              strokeWidth={7}
+              geodesic
+            />
+            {/* Main route on top */}
+            <Polyline
+              coordinates={stepPoints.map((p) => ({
+                latitude: p.latitude,
+                longitude: p.longitude,
+              }))}
+              strokeColor={colorScheme === "dark" ? "#90caf9" : "#1976d2"}
+              strokeWidth={3}
+              geodesic
+            />
+          </>
         ) : null}
       </MapView>
       <View
@@ -489,6 +525,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     height: "100%",
     backgroundColor: "blue",
+  },
+  markerContainer: {
+    alignItems: "center",
+  },
+  markerBubble: {
+    minWidth: 24,
+    minHeight: 24,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
+  markerText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  markerPointer: {
+    width: 0,
+    height: 0,
+    marginTop: -1,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
   },
   locateMeButton: {
     width: 40,
