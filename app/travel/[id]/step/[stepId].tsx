@@ -19,6 +19,7 @@ import {
   View,
 } from "react-native";
 import MapView, { Marker, Region } from "react-native-maps";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type StepRow = {
   ID: number;
@@ -218,119 +219,130 @@ export default function EditStepScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={{ flex: 1 }}
     >
-      <ScrollView contentContainerStyle={styles.container}>
-        <ThemedText style={styles.title}>{"Modifier l'étape"}</ThemedText>
+      <SafeAreaView>
+        <ScrollView contentContainerStyle={styles.container}>
+          <ThemedText style={styles.title}>{"Modifier l'étape"}</ThemedText>
 
-        <View style={styles.field}>
-          <ThemedLabel>Nom du lieu</ThemedLabel>
-          <ThemedTextInput
-            value={form.title}
-            onChangeText={(t) => setForm((s) => ({ ...s, title: t }))}
-          />
-        </View>
-
-        <View style={styles.field}>
-          <ThemedLabel>Localisation du lieu</ThemedLabel>
-          <ThemedTextInput
-            value={form.location}
-            onChangeText={(t) => setForm((s) => ({ ...s, location: t }))}
-          />
-          <View style={{ marginTop: 8 }}>
-            <ThemedButton title="Géocoder l'adresse" onPress={geocodeAddress} />
+          <View style={styles.field}>
+            <ThemedLabel>Nom du lieu</ThemedLabel>
+            <ThemedTextInput
+              value={form.title}
+              onChangeText={(t) => setForm((s) => ({ ...s, title: t }))}
+            />
           </View>
-        </View>
 
-        <View style={{ gap: 8 }}>
-          <ThemedLabel>Position sur la carte</ThemedLabel>
-          <MapView
-            style={{ width: "100%", height: 220, borderRadius: 8 }}
-            initialRegion={mapRegion}
-            region={mapRegion}
-            onPress={(e) => {
-              const { latitude, longitude } = e.nativeEvent.coordinate;
-              setFromMap(latitude, longitude);
-            }}
-          >
+          <View style={styles.field}>
+            <ThemedLabel>Localisation du lieu</ThemedLabel>
+            <ThemedTextInput
+              value={form.location}
+              onChangeText={(t) => setForm((s) => ({ ...s, location: t }))}
+            />
+            <View style={{ marginTop: 8 }}>
+              <ThemedButton
+                title="Géocoder l'adresse"
+                onPress={geocodeAddress}
+              />
+            </View>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <ThemedLabel>Position sur la carte</ThemedLabel>
+            <MapView
+              style={{ width: "100%", height: 220, borderRadius: 8 }}
+              initialRegion={mapRegion}
+              region={mapRegion}
+              onPress={(e) => {
+                const { latitude, longitude } = e.nativeEvent.coordinate;
+                setFromMap(latitude, longitude);
+              }}
+            >
+              {typeof form.latitude === "number" &&
+                typeof form.longitude === "number" && (
+                  <Marker
+                    coordinate={{
+                      latitude: form.latitude,
+                      longitude: form.longitude,
+                    }}
+                  />
+                )}
+            </MapView>
             {typeof form.latitude === "number" &&
               typeof form.longitude === "number" && (
-                <Marker
-                  coordinate={{
-                    latitude: form.latitude,
-                    longitude: form.longitude,
-                  }}
-                />
+                <ThemedText>{`Lat: ${form.latitude.toFixed(
+                  6
+                )}  Lng: ${form.longitude.toFixed(6)}`}</ThemedText>
               )}
-          </MapView>
-          {typeof form.latitude === "number" &&
-            typeof form.longitude === "number" && (
-              <ThemedText>{`Lat: ${form.latitude.toFixed(
-                6
-              )}  Lng: ${form.longitude.toFixed(6)}`}</ThemedText>
+          </View>
+
+          <View style={styles.field}>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowStartPicker(true);
+              }}
+            >
+              <ThemedLabel>
+                {`Date de début: ${formatDateDisplay(
+                  parseDateOrToday(form.startDate)
+                )}`}
+              </ThemedLabel>
+            </Pressable>
+            {showStartPicker && (
+              <DateTimePicker
+                value={parseDateOrToday(form.startDate)}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={(_, d) => {
+                  if (d) setForm((s) => ({ ...s, startDate: formatDate(d) }));
+                  setShowStartPicker(false);
+                }}
+              />
             )}
-        </View>
+          </View>
 
-        <View style={styles.field}>
-          <Pressable
-            onPress={() => {
-              Keyboard.dismiss();
-              setShowStartPicker(true);
-            }}
-          >
-            <ThemedLabel>
-              {`Date de début: ${formatDateDisplay(
-                parseDateOrToday(form.startDate)
-              )}`}
-            </ThemedLabel>
-          </Pressable>
-          {showStartPicker && (
-            <DateTimePicker
-              value={parseDateOrToday(form.startDate)}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(_, d) => {
-                if (d) setForm((s) => ({ ...s, startDate: formatDate(d) }));
-                setShowStartPicker(false);
+          <View style={styles.field}>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                setShowEndPicker(true);
               }}
-            />
-          )}
-        </View>
+            >
+              <ThemedLabel>
+                {`Date de fin: ${formatDateDisplay(
+                  parseDateOrToday(form.endDate)
+                )}`}
+              </ThemedLabel>
+            </Pressable>
+            {showEndPicker && (
+              <DateTimePicker
+                value={parseDateOrToday(form.endDate)}
+                mode="date"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                onChange={(_, d) => {
+                  if (d) setForm((s) => ({ ...s, endDate: formatDate(d) }));
+                  setShowEndPicker(false);
+                }}
+              />
+            )}
+          </View>
 
-        <View style={styles.field}>
-          <Pressable
-            onPress={() => {
-              Keyboard.dismiss();
-              setShowEndPicker(true);
-            }}
-          >
-            <ThemedLabel>
-              {`Date de fin: ${formatDateDisplay(
-                parseDateOrToday(form.endDate)
-              )}`}
-            </ThemedLabel>
-          </Pressable>
-          {showEndPicker && (
-            <DateTimePicker
-              value={parseDateOrToday(form.endDate)}
-              mode="date"
-              display={Platform.OS === "ios" ? "spinner" : "default"}
-              onChange={(_, d) => {
-                if (d) setForm((s) => ({ ...s, endDate: formatDate(d) }));
-                setShowEndPicker(false);
-              }}
+          <View style={{ gap: 8 }}>
+            <ThemedButton title="Enregistrer" onPress={handleSave} />
+            <ThemedButton
+              title="Checklist de préparation"
+              onPress={() =>
+                router.push(`/travel/${voyageId}/step/${stepId}/checklist`)
+              }
             />
-          )}
-        </View>
-
-        <View style={{ gap: 8 }}>
-          <ThemedButton title="Enregistrer" onPress={handleSave} />
-          <ThemedButton
-            title="Supprimer l'étape"
-            onPress={handleDelete}
-            lightColor="#e11d48"
-            darkColor="#e11d48"
-          />
-        </View>
-      </ScrollView>
+            <ThemedButton
+              title="Supprimer l'étape"
+              onPress={handleDelete}
+              lightColor="#e11d48"
+              darkColor="#e11d48"
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     </KeyboardAvoidingView>
   );
 }

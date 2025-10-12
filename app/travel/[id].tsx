@@ -237,6 +237,18 @@ export default function TravelDetailScreen() {
                       ])
                     }
                   />
+                  <ThemedButton
+                    title="Journal"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/travel/[id]/step/[stepId]/journal",
+                        params: {
+                          id: String(voyage.ID),
+                          stepId: String(st.ID),
+                        },
+                      } as any)
+                    }
+                  />
                 </View>
               </View>
             ))}

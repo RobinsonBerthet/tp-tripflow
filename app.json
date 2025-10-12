@@ -14,11 +14,12 @@
         "NSLocationWhenInUseUsageDescription": "Votre position est utilisée pour centrer la carte autour de vous.",
         "NSCameraUsageDescription": "L'app a besoin d'accéder à la caméra pour prendre des photos de couverture de voyage.",
         "NSPhotoLibraryUsageDescription": "L'app a besoin d'accéder à votre bibliothèque pour sélectionner une photo de couverture.",
-        "NSPhotoLibraryAddUsageDescription": "L'app peut enregistrer des photos sélectionnées dans votre bibliothèque."
+        "NSPhotoLibraryAddUsageDescription": "L'app peut enregistrer des photos sélectionnées dans votre bibliothèque.",
+        "NSMicrophoneUsageDescription": "Le micro est utilisé pour enregistrer des notes audio dans le journal."
       }
     },
     "android": {
-      "permissions": ["CAMERA"],
+      "permissions": ["CAMERA", "RECORD_AUDIO"],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/iconApp.png",
