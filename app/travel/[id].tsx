@@ -143,7 +143,9 @@ export default function TravelDetailScreen() {
             style={styles.image}
           >
             <View style={styles.heroTopPanel}>
-              <ThemedText style={styles.title}>{voyage.TITRE}</ThemedText>
+              <ThemedText style={styles.title} onLightCard>
+                {voyage.TITRE}
+              </ThemedText>
             </View>
           </ImageBackground>
         </View>
@@ -151,16 +153,20 @@ export default function TravelDetailScreen() {
         <View style={styles.metaCard}>
           <View style={styles.row}>
             <Ionicons name="location-sharp" size={16} color="#666" />
-            <ThemedText style={styles.metaText}>{voyage.LIEU}</ThemedText>
+            <ThemedText style={styles.metaText} onLightCard>
+              {voyage.LIEU}
+            </ThemedText>
           </View>
-          <ThemedText style={styles.metaText}>
+          <ThemedText style={styles.metaText} onLightCard>
             du {formatDateDisplay(voyage.DATE_ALLER)} au{" "}
             {formatDateDisplay(voyage.DATE_RETOUR)}
           </ThemedText>
         </View>
 
         <View style={styles.descCard}>
-          <ThemedText style={styles.desc}>{voyage.DESCRIPTION}</ThemedText>
+          <ThemedText style={styles.desc} onLightCard>
+            {voyage.DESCRIPTION}
+          </ThemedText>
         </View>
 
         <View style={styles.stepsHeader}>
@@ -185,17 +191,17 @@ export default function TravelDetailScreen() {
             {steps.map((st) => (
               <View key={String(st.ID)} style={styles.stepCard}>
                 <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.stepTitle}>
+                  <ThemedText style={styles.stepTitle} onLightCard>
                     {st.NOM_LIEU}
                   </ThemedText>
-                  <ThemedText style={styles.metaText}>
+                  <ThemedText style={styles.metaText} onLightCard>
                     {st.LOCALISATION}
                   </ThemedText>
-                  <ThemedText style={styles.metaText}>
+                  <ThemedText style={styles.metaText} onLightCard>
                     du {formatDateDisplay2(st.DATE_DEBUT)} au{" "}
                     {formatDateDisplay2(st.DATE_FIN)}
                   </ThemedText>
-                  <ThemedText style={styles.stepDesc}>
+                  <ThemedText style={styles.stepDesc} onLightCard>
                     {st.DESCRIPTION}
                   </ThemedText>
                 </View>
@@ -205,6 +211,18 @@ export default function TravelDetailScreen() {
                     onPress={() =>
                       router.push({
                         pathname: "/travel/[id]/step/[stepId]",
+                        params: {
+                          id: String(voyage.ID),
+                          stepId: String(st.ID),
+                        },
+                      } as any)
+                    }
+                  />
+                  <ThemedButton
+                    title="Checklist"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/travel/[id]/step/[stepId]/checklist",
                         params: {
                           id: String(voyage.ID),
                           stepId: String(st.ID),

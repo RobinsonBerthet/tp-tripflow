@@ -329,12 +329,6 @@ export default function EditStepScreen() {
           <View style={{ gap: 8 }}>
             <ThemedButton title="Enregistrer" onPress={handleSave} />
             <ThemedButton
-              title="Checklist de préparation"
-              onPress={() =>
-                router.push(`/travel/${voyageId}/step/${stepId}/checklist`)
-              }
-            />
-            <ThemedButton
               title="Supprimer l'étape"
               onPress={handleDelete}
               lightColor="#e11d48"

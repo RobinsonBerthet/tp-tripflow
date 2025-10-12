@@ -158,10 +158,12 @@ export default function StepJournalScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.container}>
-          <ThemedText style={styles.title}>{"Journal de l'étape"}</ThemedText>
+          <ThemedText style={styles.title} onLightCard>
+            {"Journal de l'étape"}
+          </ThemedText>
 
           <View style={styles.formCard}>
-            <ThemedLabel>Nouvelle entrée</ThemedLabel>
+            <ThemedLabel onLightCard>Nouvelle entrée</ThemedLabel>
             <ThemedTextInput
               placeholder="Racontez votre journée, vos ressentis, etc."
               value={newContent}
@@ -224,14 +226,16 @@ export default function StepJournalScreen() {
 
           <View style={{ gap: 12 }}>
             {entries.length === 0 ? (
-              <ThemedText>Aucune entrée pour cette étape.</ThemedText>
+              <ThemedText onLightCard>
+                Aucune entrée pour cette étape.
+              </ThemedText>
             ) : (
               entries.map((e) => (
                 <View key={String(e.ID)} style={styles.entryCard}>
-                  <ThemedText style={styles.entryDate}>
+                  <ThemedText style={styles.entryDate} onLightCard>
                     {formatDateDisplay(e.DATE)}
                   </ThemedText>
-                  <ThemedText style={styles.entryContent}>
+                  <ThemedText style={styles.entryContent} onLightCard>
                     {e.CONTENU}
                   </ThemedText>
                   {/* Affichage des photos associées à l'entrée */}

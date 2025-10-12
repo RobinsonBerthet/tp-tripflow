@@ -147,12 +147,12 @@ export default function StepChecklistScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.container}>
-          <ThemedText style={styles.title}>
+          <ThemedText style={styles.title} onLightCard>
             {"Checklist de préparation"}
           </ThemedText>
 
           <View style={styles.card}>
-            <ThemedLabel>Nouvelle liste</ThemedLabel>
+            <ThemedLabel onLightCard>Nouvelle liste</ThemedLabel>
             <ThemedTextInput
               placeholder="Ex: Valise, Documents, Trousse de secours"
               value={newListTitle}
@@ -164,13 +164,15 @@ export default function StepChecklistScreen() {
 
           <View style={{ gap: 12 }}>
             {lists.length === 0 ? (
-              <ThemedText>
+              <ThemedText onLightCard>
                 Aucune liste. Ajoutez votre première liste ci-dessus.
               </ThemedText>
             ) : (
               lists.map((l) => (
                 <View key={`list-${l.ID}`} style={styles.card}>
-                  <ThemedText style={styles.listTitle}>{l.TITRE}</ThemedText>
+                  <ThemedText style={styles.listTitle} onLightCard>
+                    {l.TITRE}
+                  </ThemedText>
 
                   {/* Items */}
                   <View style={{ gap: 8 }}>
@@ -205,7 +207,7 @@ export default function StepChecklistScreen() {
 
                   {/* Ajouter un item */}
                   <View style={{ height: 8 }} />
-                  <ThemedLabel>Nouvel item</ThemedLabel>
+                  <ThemedLabel onLightCard>Nouvel item</ThemedLabel>
                   <ThemedTextInput
                     placeholder="Ex: Passeport, Brosse à dents, T-shirt"
                     value={newItemTextByListId[l.ID] ?? ""}
