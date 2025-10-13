@@ -2,6 +2,7 @@ import { ThemedButton } from "@/components/atomes/ThemedButton";
 import ThemedText from "@/components/atomes/ThemedText";
 import { ThemedTextInput } from "@/components/atomes/ThemedTextInput";
 import useSQLite from "@/hooks/use-sqlite";
+import { useTravelStore } from "@/stores/travelStore";
 import bcrypt from "bcryptjs";
 import { useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -21,6 +22,7 @@ export default function AccountSlide({
 }: AccountSlideProps) {
   const router = useRouter();
   const { ready, queryOne, run } = useSQLite("tripflow.db");
+  const resetTravelState = useTravelStore((s) => s.resetTravelState);
 
   const [user, setUser] = useState<{
     ID: number;
@@ -74,8 +76,11 @@ export default function AccountSlide({
     try {
       await SecureStore.deleteItemAsync("userLogin");
       await SecureStore.deleteItemAsync("userPassword");
-    } catch {}
-    router.replace("/");
+    } catch {
+    } finally {
+      resetTravelState();
+      router.replace("/");
+    }
   };
 
   const handleChangePassword = async () => {

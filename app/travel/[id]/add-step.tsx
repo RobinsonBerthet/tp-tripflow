@@ -75,8 +75,18 @@ export default function AddStepScreen() {
       Alert.alert("Erreur", "Voyage invalide.");
       return;
     }
-    if (!form.title || !form.location || !form.startDate || !form.endDate) {
-      Alert.alert("Champs requis", "Veuillez compléter tous les champs.");
+    const hasCoords =
+      typeof form.latitude === "number" && typeof form.longitude === "number";
+    if (
+      !form.title ||
+      !form.startDate ||
+      !form.endDate ||
+      (!form.location && !hasCoords)
+    ) {
+      Alert.alert(
+        "Champs requis",
+        "Renseignez la localisation ou placez un point sur la carte."
+      );
       return;
     }
     try {
@@ -120,7 +130,7 @@ export default function AddStepScreen() {
         [
           voyageId,
           form.title,
-          form.location,
+          form.location || "",
           form.startDate,
           form.endDate,
           form.description,

@@ -179,6 +179,7 @@ export default function TravelDetailScreen() {
                 params: { id: String(voyage.ID) },
               } as any)
             }
+            style={{ paddingHorizontal: 10 }}
           />
         </View>
 

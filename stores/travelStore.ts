@@ -8,6 +8,7 @@ type TravelStore = {
   setSelectedTab: (tab: "home" | "voyages" | "profil") => void;
   stepsVersion: number;
   bumpStepsVersion: () => void;
+  resetTravelState: () => void;
 };
 
 export const useTravelStore = create<TravelStore>((set) => ({
@@ -18,4 +19,6 @@ export const useTravelStore = create<TravelStore>((set) => ({
   setSelectedTab: (tab) => set({ selectedTab: tab }),
   stepsVersion: 0,
   bumpStepsVersion: () => set((s) => ({ stepsVersion: s.stepsVersion + 1 })),
+  resetTravelState: () =>
+    set({ selectedVoyageId: null, selectedTab: "home", stepsVersion: 0 }),
 }));
